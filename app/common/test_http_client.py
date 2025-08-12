@@ -19,7 +19,12 @@ def test_trace_id_missing():
     assert resp.text == ""
 
 
-def test_trace_id_set():
+def test_trace_id_set(monkeypatch):
+    # Set the tracing header config for this test
+    from config import config
+
+    monkeypatch.setattr(config, "tracing_header", "x-cdp-request-id")
+
     ctx_trace_id.set("trace-id-value")
     client = httpx.Client(
         event_hooks={"request": [hook_request_tracing]},

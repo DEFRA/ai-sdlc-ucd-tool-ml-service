@@ -6,7 +6,7 @@ from pymongo import AsyncMongoClient
 from pymongo.asynchronous.database import AsyncDatabase
 
 from app.common.tls import custom_ca_certs
-from app.config import config
+from config import config
 
 logger = getLogger(__name__)
 
@@ -17,6 +17,10 @@ db: Optional[AsyncDatabase] = None
 async def get_mongo_client() -> AsyncMongoClient:
     global client
     if client is None:
+        if not config.mongo_uri:
+            msg = "MONGO_URI configuration is required"
+            raise ValueError(msg)
+
         # Use the custom CA Certs from env vars if set.
         # We can remove this once we migrate to mongo Atlas.
         cert = custom_ca_certs.get(config.mongo_truststore)
@@ -38,6 +42,9 @@ async def get_mongo_client() -> AsyncMongoClient:
 async def get_db(client: AsyncMongoClient = Depends(get_mongo_client)) -> AsyncDatabase:
     global db
     if db is None:
+        if not config.mongo_database:
+            msg = "MONGO_DATABASE configuration is required"
+            raise ValueError(msg)
         db = client.get_database(config.mongo_database)
     return db
 

@@ -4,7 +4,7 @@ from logging import getLogger
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.config import config
+from config import config
 
 logger = getLogger(__name__)
 
@@ -19,7 +19,9 @@ ctx_response = contextvars.ContextVar("response")
 # for the duration of the request in the ContextVar `ctx_trace_id`.
 class TraceIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        req_trace_id = request.headers.get(config.tracing_header, None)
+        req_trace_id = None
+        if config.tracing_header:
+            req_trace_id = request.headers.get(config.tracing_header, None)
         if req_trace_id:
             ctx_trace_id.set(req_trace_id)
 
