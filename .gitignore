@@ -9,3 +9,7 @@ coverage
 .cache
 .envrc
 tsconfig.tsbuildinfo
+.coverage
+coverage.xml
+.venv
+.env*
