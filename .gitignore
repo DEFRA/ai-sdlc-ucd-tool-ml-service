@@ -13,3 +13,4 @@ tsconfig.tsbuildinfo
 coverage.xml
 .venv
 .env*
+/compose/secrets.env

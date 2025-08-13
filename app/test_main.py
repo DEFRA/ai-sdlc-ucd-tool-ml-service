@@ -6,7 +6,9 @@ client = TestClient(app)
 
 
 def test_example():
-    response = client.get("/example/test")
+    response = client.get(
+        "/example/test", headers={"Authorization": "Bearer test.jwt.token"}
+    )
     assert response.status_code == 200
     assert response.json() == {"ok": True}
 
@@ -18,5 +20,5 @@ def test_health():
 
 
 def test_root():
-    response = client.get("/")
+    response = client.get("/", headers={"Authorization": "Bearer test.jwt.token"})
     assert response.status_code == 404
