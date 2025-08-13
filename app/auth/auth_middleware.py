@@ -4,6 +4,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.auth.jwt_validation import extract_bearer_token, validate_token
 from app.auth.public_endpoints import is_public_endpoint
 
 logger = getLogger(__name__)
@@ -16,28 +17,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
             logger.debug("Skipping auth for public endpoint: %s", request.url.path)
             return await call_next(request)
 
-        # For now, just log that auth would be required
-        logger.info("Authentication required for: %s", request.url.path)
-
-        # Check for Authorization header
+        # Extract token from Authorization header
         auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            logger.warning("Missing Authorization header for: %s", request.url.path)
-            return JSONResponse(
-                status_code=401, content={"detail": "Authorization header required"}
-            )
+        token = extract_bearer_token(auth_header)
 
-        if not auth_header.startswith("Bearer "):
-            logger.warning(
-                "Invalid Authorization header format for: %s", request.url.path
-            )
+        # Validate token against Azure JWKS
+        if not validate_token(token):
+            logger.warning("Invalid or missing token for: %s", request.url.path)
             return JSONResponse(
                 status_code=401,
-                content={"detail": "Invalid authorization header format"},
+                content={"detail": "Valid authorization token required"},
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Extract JWT token (for now just log it)
-        # token = auth_header[7:]  # Remove "Bearer " prefix - will be used for validation
-        logger.info("JWT token present for: %s", request.url.path)
+        logger.info("Valid Azure token provided for: %s", request.url.path)
 
-        return await call_next(request)
+        # Return success hello world response for valid tokens
+        return JSONResponse(
+            status_code=200, content={"message": "Hello World! Token is valid."}
+        )

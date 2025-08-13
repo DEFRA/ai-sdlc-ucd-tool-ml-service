@@ -5,6 +5,7 @@ Configuration for public endpoints that do not require authentication.
 PUBLIC_ENDPOINTS = {
     "/health",
     "/http",
+    "/favicon.ico",
 }
 
 
