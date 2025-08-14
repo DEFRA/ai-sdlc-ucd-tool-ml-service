@@ -21,14 +21,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         auth_header = request.headers.get("Authorization")
         token = extract_bearer_token(auth_header)
 
-        # Validate token against Azure JWKS
-        if not validate_token(token):
-            logger.warning("Invalid or missing token for: %s", request.url.path)
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Valid authorization token required"},
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        # Validate token against Azure JWKS - will raise HTTPException if invalid
+        decoded_token = validate_token(token)
+
+        # Store the decoded token in request state for downstream use
+        request.state.user = decoded_token
 
         logger.info("Valid Azure token provided for: %s", request.url.path)
 

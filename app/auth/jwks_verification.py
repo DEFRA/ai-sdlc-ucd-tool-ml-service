@@ -6,6 +6,7 @@ from typing import Optional
 
 import httpx
 import jwt
+from fastapi import HTTPException
 from jwt import PyJWKClient
 
 from app.config import config
@@ -41,14 +42,19 @@ def get_jwks_client() -> PyJWKClient:
     return _jwks_client
 
 
-def validate_azure_token(token: str) -> bool:
+def validate_azure_token(token: str) -> dict:
     """
     Validate Azure AD JWT token against JWKS endpoint.
 
-    Returns True if token is valid, False otherwise.
+    Returns the decoded token payload if valid.
+    Raises HTTPException with appropriate status code and message if invalid.
     """
     if not token:
-        return False
+        raise HTTPException(
+            status_code=401,
+            detail="No token provided",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     try:
         # Get JWKS client
@@ -59,7 +65,7 @@ def validate_azure_token(token: str) -> bool:
 
         # Decode and validate token
         # Azure AD tokens typically use RS256
-        jwt.decode(
+        decoded = jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
@@ -72,17 +78,31 @@ def validate_azure_token(token: str) -> bool:
         )
 
         logger.info("Token validated successfully")
-        return True
+        return decoded
 
     except jwt.ExpiredSignatureError:
         logger.warning("Token has expired")
-        return False
-    except jwt.InvalidTokenError as e:
-        logger.warning("Invalid token: %s", str(e))
-        return False
+        raise HTTPException(
+            status_code=401,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
     except httpx.TimeoutException:
         logger.error("Timeout fetching JWKS")
-        return False
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable - JWKS fetch timeout",
+        ) from None
+    except jwt.InvalidTokenError as e:
+        logger.warning("Invalid token: %s", str(e))
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
     except Exception as e:
         logger.error("Token validation error: %s", str(e))
-        return False
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error during token validation",
+        ) from None

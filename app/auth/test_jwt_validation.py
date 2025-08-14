@@ -2,6 +2,9 @@
 
 from unittest.mock import patch
 
+import pytest
+from fastapi import HTTPException
+
 from app.auth.jwt_validation import extract_bearer_token, validate_token
 
 
@@ -13,21 +16,44 @@ class TestExtractBearerToken:
         extracted = extract_bearer_token("Bearer this-is-a-test")
         assert extracted == "this-is-a-test"
 
-    def test_returns_none_when_no_header(self):
-        """Should return None when no header provided."""
-        assert extract_bearer_token(None) is None
-        assert extract_bearer_token("") is None
+    def test_raises_exception_when_no_header(self):
+        """Should raise HTTPException when no header provided."""
+        with pytest.raises(HTTPException) as exc_info:
+            extract_bearer_token(None)
+        assert exc_info.value.status_code == 401
+        assert "Authorization header required" in exc_info.value.detail
 
-    def test_returns_none_for_non_bearer_scheme(self):
-        """Should return None when scheme is not Bearer."""
-        assert extract_bearer_token("Basic dXNlcjpwYXNz") is None
-        assert extract_bearer_token("Digest realm=example") is None
+        with pytest.raises(HTTPException) as exc_info:
+            extract_bearer_token("")
+        assert exc_info.value.status_code == 401
 
-    def test_returns_none_for_malformed_header(self):
-        """Should return None when header is malformed."""
-        assert extract_bearer_token("Bearer") is None
-        assert extract_bearer_token("JustAToken") is None
-        assert extract_bearer_token("Bearer    ") is None
+    def test_raises_exception_for_non_bearer_scheme(self):
+        """Should raise HTTPException when scheme is not Bearer."""
+        with pytest.raises(HTTPException) as exc_info:
+            extract_bearer_token("Basic dXNlcjpwYXNz")
+        assert exc_info.value.status_code == 401
+        assert "Bearer required" in exc_info.value.detail
+
+        with pytest.raises(HTTPException) as exc_info:
+            extract_bearer_token("Digest realm=example")
+        assert exc_info.value.status_code == 401
+
+    def test_raises_exception_for_malformed_header(self):
+        """Should raise HTTPException when header is malformed."""
+        with pytest.raises(HTTPException) as exc_info:
+            extract_bearer_token("Bearer")
+        assert exc_info.value.status_code == 401
+        assert "Invalid authorization header format" in exc_info.value.detail
+
+        with pytest.raises(HTTPException) as exc_info:
+            extract_bearer_token("JustAToken")
+        assert exc_info.value.status_code == 401
+        assert "Invalid authorization header format" in exc_info.value.detail
+
+        with pytest.raises(HTTPException) as exc_info:
+            extract_bearer_token("Bearer    ")
+        assert exc_info.value.status_code == 401
+        assert "Bearer token is empty" in exc_info.value.detail
 
     def test_handles_case_insensitive_bearer(self):
         """Should handle Bearer in any case."""
@@ -42,14 +68,21 @@ class TestValidateToken:
     @patch("app.auth.jwt_validation.validate_azure_token")
     def test_delegates_to_azure_validator(self, mock_azure_validate):
         """Should delegate validation to Azure validator."""
-        mock_azure_validate.return_value = True
+        mock_decoded = {"sub": "user123", "exp": 9999999999}
+        mock_azure_validate.return_value = mock_decoded
 
         result = validate_token("test-token")
 
-        assert result is True
+        assert result == mock_decoded
         mock_azure_validate.assert_called_once_with("test-token")
 
-    def test_no_token_returns_false(self):
-        """Should return False when no token provided."""
-        assert validate_token(None) is False
-        assert validate_token("") is False
+    def test_no_token_raises_exception(self):
+        """Should raise HTTPException when no token provided."""
+        with pytest.raises(HTTPException) as exc_info:
+            validate_token(None)
+        assert exc_info.value.status_code == 401
+        assert "No token provided" in exc_info.value.detail
+
+        with pytest.raises(HTTPException) as exc_info:
+            validate_token("")
+        assert exc_info.value.status_code == 401
